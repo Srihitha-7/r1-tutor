@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐍 RL Python Tutor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ───────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f0ede8;
+  --surface:   #ffffff;
+  --panel:     #faf9f6;
+  --border:    #ddd8d0;
+  --text:      #1a1612;
+  --muted:     #7a7068;
+  --accent:    #2752e8;
+  --accent2:   #7c3aed;
+  --success:   #15803d;
+  --danger:    #dc2626;
+  --warn:      #d97706;
+  --cell-done: #d1fae5;
+  --cell-goal: #dbeafe;
+  --cell-wrong:#fee2e2;
+  --cell-guide:#fef3c7;
+  --groq-bg:   #fefce8;
+  --groq-fg:   #713f12;
+  --shadow:    0 2px 12px rgba(0,0,0,.08);
+  --radius:    10px;
+}
+
+body {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── LAYOUT ─────────────────────────────────────────── */
+.app-header {
+  background: var(--text);
+  color: #fff;
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 3px solid var(--accent);
+}
+.app-header h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.3rem;
+  letter-spacing: -.02em;
+  color: #fff;
+}
+.header-badge {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  font-size: .65rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.main-layout {
+  display: grid;
+  grid-template-columns: 580px 1fr;
+  gap: 20px;
+  padding: 20px 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+/* ── GRID ───────────────────────────────────────────── */
+#grid-canvas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: var(--shadow);
+}
+
+.grid-cell {
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: transform .12s, box-shadow .12s, background .18s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  overflow: hidden;
+  user-select: none;
+}
+.grid-cell:hover { transform: scale(1.04); box-shadow: 0 4px 16px rgba(39,82,232,.18); }
+.grid-cell.done  { background: var(--cell-done) !important; border-color: #6ee7b7; }
+.grid-cell.goal  { background: var(--cell-goal) !important; border-color: #93c5fd; cursor: default; }
+.grid-cell.wrong { background: var(--cell-wrong) !important; border-color: #fca5a5; }
+.grid-cell.guide { background: var(--cell-guide) !important; border-color: #fcd34d; }
+
+.cell-pos {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: .55rem;
+  color: #b0a898;
+  font-weight: 600;
+}
+.cell-code {
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.4;
+  word-break: break-all;
+  color: var(--text);
+}
+.cell-code.dummy { color: var(--text); font-weight: 700; }
+.cell-goal-icon  { font-size: 1.5rem; }
+
+/* Flash animation */
+@keyframes flashRed {
+  0%, 100% { background: var(--cell-wrong); }
+  50%       { background: #fecaca; }
+}
+.grid-cell.flashing { animation: flashRed .3s ease 2; }
+
+/* ── RIGHT PANEL ─────────────────────────────────────── */
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: .85rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* Problem selector */
+.select-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+select#problem-select {
+  flex: 1;
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .8rem;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+select#problem-select:focus { border-color: var(--accent); }
+
+.btn {
+  border: none;
+  border-radius: 7px;
+  padding: 7px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn:hover  { opacity: .88; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary { background: var(--accent);  color: #fff; }
+.btn-sec     { background: #eee; color: #333; }
+.btn-groq    { background: var(--groq-bg);   color: var(--groq-fg);   border: 1px solid #fde68a; }
+.btn-danger  { background: #fee2e2; color: var(--danger); }
+.btn-feedback { background: #ffffff; color: #3730a3; border: 1.5px solid #c7d2fe; }
+.btn-guide    { background: #ffffff; color: #d97706; border: 1.5px solid #fcd34d; }
+.btn-row     { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Level badge */
+.level-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.badge {
+  font-size: .65rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.badge-level  { background: #dbeafe; color: #1d4ed8; }
+.badge-builtin{ background: #e0f2fe; color: #0369a1; }
+.badge-groq   { background: var(--groq-bg);   color: var(--groq-fg); }
+
+/* Hint card */
+.hint-box {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 9px;
+  padding: 14px 16px;
+}
+.hint-label {
+  font-size: .68rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 6px;
+}
+#hint-text {
+  font-size: .9rem;
+  color: var(--accent2);
+  font-weight: 600;
+  line-height: 1.5;
+}
+#sub-label {
+  font-size: .7rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Reward */
+.reward-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.reward-label { font-size: .78rem; color: var(--muted); }
+#reward-val {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--danger);
+  font-family: 'Syne', sans-serif;
+  transition: color .3s;
+}
+#status-msg {
+  font-size: .8rem;
+  margin-top: 6px;
+  min-height: 1.2em;
+  font-weight: 600;
+}
+
+/* Full code */
+#full-code {
+  width: 100%;
+  background: #1e1b18;
+  color: #e8e0d4;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  resize: vertical;
+  min-height: 120px;
+  outline: none;
+}
+
+/* Loading overlay */
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+}
+#loading-overlay.show { display: flex; }
+.loading-box {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 32px 40px;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0,0,0,.25);
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── FEEDBACK MODAL ──────────────────────────────────── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal-backdrop.show { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 60px rgba(0,0,0,.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%);
+  padding: 22px 24px 16px;
+  border-bottom: 1.5px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-radius: 16px 16px 0 0;
+}
+.modal-header h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.2rem;
+  color: var(--text);
+}
+.modal-meta {
+  font-size: .7rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.fb-section {
+  margin-bottom: 20px;
+}
+.fb-section-title {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Stars */
+.stars { display: flex; gap: 6px; }
+.star-btn {
+  background: none;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  width: 46px; height: 46px;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.star-btn.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+.star-btn:hover { border-color: #f59e0b; }
+
+/* Radio options */
+.radio-options { display: flex; flex-direction: column; gap: 6px; }
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .12s;
+  font-size: .82rem;
+}
+.radio-option:hover  { border-color: var(--accent); background: #f0f4ff; }
+.radio-option.selected {
+  border-color: var(--accent);
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+.radio-option input { display: none; }
+
+/* Scored options layout */
+.radio-option.scored { justify-content: space-between; }
+.opt-text { flex: 1; }
+.opt-score {
+  min-width: 26px;
+  height: 26px;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 50%;
+  font-size: .72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.radio-option.scored.selected .opt-score {
+  background: var(--accent);
+  color: #fff;
+}
+.score-note {
+  font-size: .65rem;
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-style: italic;
+}
+.score-legend {
+  font-size: .65rem;
+  color: var(--muted);
+  margin-top: 6px;
+}
+/* Difficulty score badge */
+.diff-score {
+  display: inline-block;
+  margin-left: 6px;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  font-size: .65rem;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+}
+.diff-btn.selected .diff-score {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Difficulty toggle */
+.diff-options { display: flex; gap: 8px; }
+.diff-btn {
+  flex: 1;
+  padding: 9px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all .12px;
+}
+.diff-btn.selected { background: #dbeafe; border-color: var(--accent); color: #1d4ed8; }
+
+/* Suggestions textarea */
+#fb-suggestions {
+  width: 100%;
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .8rem;
+  resize: vertical;
+  min-height: 80px;
+  outline: none;
+  color: var(--text);
+  transition: border-color .15s;
+}
+#fb-suggestions:focus { border-color: var(--accent); }
+
+/* Modal footer */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1.5px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-radius: 0 0 16px 16px;
+}
+
+/* Generate modal */
+.gen-modal-body { padding: 24px; }
+.gen-modal-body input[type="text"] {
+  width: 100%;
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .88rem;
+  color: var(--text);
+  margin-top: 8px;
+  outline: none;
+}
+.gen-modal-body input:focus { border-color: var(--accent); }
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text);
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: 30px;
+  font-size: .82rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: all .3s;
+  z-index: 2000;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── RESPONSIVE ──────────────────────────────────────── */
+@media (max-width: 960px) {
+  .main-layout { grid-template-columns: 1fr; }
+  #grid-canvas  { max-width: 520px; margin: 0 auto; }
+}
+@media (max-width: 520px) {
+  .app-header h1 { font-size: 1rem; }
+  .main-layout { padding: 12px; gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <span style="font-size:1.5rem">🐍</span>
+  <h1>RL Python Tutor</h1>
+  <span class="header-badge">Reinforcement Learning</span>
+</header>
+
+<!-- MAIN -->
+<main class="main-layout">
+
+  <!-- LEFT: GRID -->
+  <div>
+    <div id="grid-canvas"></div>
+    <div style="margin-top:14px;">
+      <label style="font-size:.72rem;font-weight:700;color:var(--muted);display:block;margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase;">Full Working Program</label>
+      <textarea id="full-code" rows="7" readonly placeholder="Complete the puzzle to reveal the program…"></textarea>
+    </div>
+  </div>
+
+  <!-- RIGHT: CONTROLS -->
+  <div class="right-panel">
+
+    <!-- Problem selector card -->
+    <div class="card">
+      <div id="level-info" class="level-info">
+        <span class="badge badge-level" id="badge-level">Level 1</span>
+        <span id="badge-topic" style="font-size:.75rem;color:var(--muted);font-weight:600"></span>
+        <span class="badge badge-builtin" id="badge-source">BUILTIN</span>
+      </div>
+
+      <div class="select-row">
+        <select id="problem-select">
+          {% for p in problems %}
+          <option value="{{ p.name }}">Lv{{ p.level }} · {{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-sec" onclick="resetEpisode()">↺ Reset</button>
+        <button class="btn btn-guide" onclick="guideMe()" style="margin-left:auto">💡 Guide Me</button>
+      </div>
+
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn btn-groq" onclick="openGenModal()">✨ Generate (Groq)</button>
+      </div>
+    </div>
+
+    <!-- Hint card -->
+    <div class="hint-box">
+      <div class="hint-label">💡 Current Step Hint</div>
+      <div id="hint-text">Loading…</div>
+      <div id="sub-label"></div>
+    </div>
+
+    <!-- Reward + status -->
+    <div class="card">
+      <div class="reward-row">
+        <span class="reward-label">Total Reward</span>
+        <span id="reward-val">0.0</span>
+      </div>
+      <div id="status-msg"></div>
+    </div>
+
+    <!-- Feedback button -->
+    <button class="btn btn-feedback" style="width:100%;padding:12px;font-size:.9rem;" onclick="openFeedback()">
+      📝 Give Feedback
+    </button>
+
+  </div>
+</main>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div id="loading-msg" style="font-size:.85rem;color:var(--muted);font-weight:600">Generating problem…</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- FEEDBACK MODAL -->
+<div class="modal-backdrop" id="fb-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📝 Learning Feedback</h2>
+      <div class="modal-meta" id="fb-meta"></div>
+    </div>
+    <div class="modal-body">
+
+      <!-- Q1: Helpfulness stars (score 1-5) -->
+      <div class="fb-section">
+        <div class="fb-section-title">1. How helpful was this problem? <span class="score-note">(score: 1–5)</span></div>
+        <div class="stars" id="stars">
+          <button class="star-btn" data-v="1" onclick="setStar(1)" title="1 - Not helpful">★</button>
+          <button class="star-btn" data-v="2" onclick="setStar(2)" title="2 - Slightly helpful">★</button>
+          <button class="star-btn" data-v="3" onclick="setStar(3)" title="3 - Moderately helpful">★</button>
+          <button class="star-btn" data-v="4" onclick="setStar(4)" title="4 - Very helpful">★</button>
+          <button class="star-btn" data-v="5" onclick="setStar(5)" title="5 - Extremely helpful">★</button>
+        </div>
+        <div class="score-legend">1 = Not helpful &nbsp;·&nbsp; 3 = Moderate &nbsp;·&nbsp; 5 = Extremely helpful</div>
+      </div>
+
+      <!-- Q2: Coding concept understanding (score 1-4) -->
+      <div class="fb-section">
+        <div class="fb-section-title">2. Did this help you understand coding concepts? <span class="score-note">(score: 1–4)</span></div>
+        <div class="radio-options" id="q2-opts">
+          <label class="radio-option scored" onclick="selectRadio('q2','Yes, very much',4,this)"><input type="radio" name="q2"><span class="opt-text">Yes, very much</span><span class="opt-score">4</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q2','Somewhat',3,this)"><input type="radio" name="q2"><span class="opt-text">Somewhat</span><span class="opt-score">3</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q2','Not really',2,this)"><input type="radio" name="q2"><span class="opt-text">Not really</span><span class="opt-score">2</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q2','Not at all',1,this)"><input type="radio" name="q2"><span class="opt-text">Not at all</span><span class="opt-score">1</span></label>
+        </div>
+      </div>
+
+      <!-- Q3: Engagement vs traditional (score 1-4) -->
+      <div class="fb-section">
+        <div class="fb-section-title">3. Was this more engaging than traditional methods? <span class="score-note">(score: 1–4)</span></div>
+        <div class="radio-options" id="q3-opts">
+          <label class="radio-option scored" onclick="selectRadio('q3','Much more engaging',4,this)"><input type="radio" name="q3"><span class="opt-text">Much more engaging</span><span class="opt-score">4</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q3','Slightly more engaging',3,this)"><input type="radio" name="q3"><span class="opt-text">Slightly more engaging</span><span class="opt-score">3</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q3','About the same',2,this)"><input type="radio" name="q3"><span class="opt-text">About the same</span><span class="opt-score">2</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q3','Less engaging',1,this)"><input type="radio" name="q3"><span class="opt-text">Less engaging</span><span class="opt-score">1</span></label>
+        </div>
+      </div>
+
+      <!-- Q4: Sequential learning (score 1-4) -->
+      <div class="fb-section">
+        <div class="fb-section-title">4. Did the step-by-step grid help you learn code sequentially? <span class="score-note">(score: 1–4)</span></div>
+        <div class="radio-options" id="q4-opts">
+          <label class="radio-option scored" onclick="selectRadio('q4','Yes, the order was very clear',4,this)"><input type="radio" name="q4"><span class="opt-text">Yes, the order was very clear</span><span class="opt-score">4</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q4','Somewhat helped',3,this)"><input type="radio" name="q4"><span class="opt-text">Somewhat helped</span><span class="opt-score">3</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q4','Sequence was confusing',2,this)"><input type="radio" name="q4"><span class="opt-text">Sequence was confusing</span><span class="opt-score">2</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q4','Did not help with sequence',1,this)"><input type="radio" name="q4"><span class="opt-text">Did not help with sequence</span><span class="opt-score">1</span></label>
+        </div>
+      </div>
+
+      <!-- Q5: Which part was most challenging (categorical) -->
+      <div class="fb-section">
+        <div class="fb-section-title">5. Which part was most challenging? <span class="score-note">(categorical)</span></div>
+        <div class="radio-options" id="q5-opts">
+          <label class="radio-option" onclick="selectRadio('q5','Identifying the correct cell',0,this)"><input type="radio" name="q5"><span class="opt-text">Identifying the correct cell</span></label>
+          <label class="radio-option" onclick="selectRadio('q5','Understanding hints',0,this)"><input type="radio" name="q5"><span class="opt-text">Understanding hints</span></label>
+          <label class="radio-option" onclick="selectRadio('q5','Code syntax',0,this)"><input type="radio" name="q5"><span class="opt-text">Code syntax</span></label>
+          <label class="radio-option" onclick="selectRadio('q5','Navigating the grid',0,this)"><input type="radio" name="q5"><span class="opt-text">Navigating the grid</span></label>
+          <label class="radio-option" onclick="selectRadio('q5','Nothing was hard',0,this)"><input type="radio" name="q5"><span class="opt-text">Nothing was hard</span></label>
+        </div>
+      </div>
+
+      <!-- Q6: Problem-solving skills (score 1-4) -->
+      <div class="fb-section">
+        <div class="fb-section-title">6. Did this improve your problem-solving skills? <span class="score-note">(score: 1–4)</span></div>
+        <div class="radio-options" id="q6-opts">
+          <label class="radio-option scored" onclick="selectRadio('q6','Definitely yes',4,this)"><input type="radio" name="q6"><span class="opt-text">Definitely yes</span><span class="opt-score">4</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q6','Probably yes',3,this)"><input type="radio" name="q6"><span class="opt-text">Probably yes</span><span class="opt-score">3</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q6','Not sure',2,this)"><input type="radio" name="q6"><span class="opt-text">Not sure</span><span class="opt-score">2</span></label>
+          <label class="radio-option scored" onclick="selectRadio('q6','Probably not',1,this)"><input type="radio" name="q6"><span class="opt-text">Probably not</span><span class="opt-score">1</span></label>
+        </div>
+      </div>
+
+      <!-- Q7: Overall difficulty (score 1-3) -->
+      <div class="fb-section">
+        <div class="fb-section-title">7. Overall difficulty <span class="score-note">(score: 1–3)</span></div>
+        <div class="diff-options">
+          <button class="diff-btn" onclick="setDiff('Too easy',1,this)">Too easy<span class="diff-score">1</span></button>
+          <button class="diff-btn selected" onclick="setDiff('Just right',2,this)">Just right<span class="diff-score">2</span></button>
+          <button class="diff-btn" onclick="setDiff('Too hard',3,this)">Too hard<span class="diff-score">3</span></button>
+        </div>
+      </div>
+
+      <!-- Q8: Suggestions (open text) -->
+      <div class="fb-section">
+        <div class="fb-section-title">8. What improvements would you suggest?</div>
+        <textarea id="fb-suggestions" placeholder="Share your thoughts…"></textarea>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sec"     onclick="closeFeedback()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
+    </div>
+  </div>
+</div>
+
+<!-- GENERATE MODAL -->
+<div class="modal-backdrop" id="gen-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2>✨ Generate Problem (Groq)</h2>
+    </div>
+    <div class="gen-modal-body">
+      <label style="font-size:.82rem;font-weight:700;color:var(--muted)">Python topic to teach:</label>
+      <input type="text" id="gen-topic" placeholder="e.g. List comprehensions, String slicing…">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sec" onclick="closeGenModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="runGenerate()">Generate →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────
+const CURRICULUM_NAMES = {{ problems | map(attribute='name') | list | tojson }};
+let state = {
+  problems: {},
+  generatedProblems: [],
+  currentName: CURRICULUM_NAMES[0],
+  current: null,
+  subgoalIdx: 0,
+  completed: [],
+  reward: 0,
+  totalClicks: 0,
+  correctClicks: 0,
+  gameOver: false,
+};
+
+const DUMMY = [
+  "result = 0","while n > 0:","return 0","print(x)",
+  "n = input()","for i in range(n):","total += i",
+  "def func():","a, b = 1, 1","return a","if n == 0:",
+];
+
+// ── INIT ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadProblem(CURRICULUM_NAMES[0]);
+  document.getElementById('problem-select').addEventListener('change', e => {
+    loadProblem(e.target.value);
+  });
+});
+
+async function loadProblem(name) {
+  if (state.problems[name]) {
+    switchTo(name, state.problems[name]);
+    return;
+  }
+  showLoading('Loading problem…');
+  try {
+    const r = await fetch(`/api/problem/${encodeURIComponent(name)}`);
+    const p = await r.json();
+    state.problems[name] = p;
+    switchTo(name, p);
+  } catch(e) {
+    showToast('❌ Failed to load problem');
+  } finally {
+    hideLoading();
+  }
+}
+
+function switchTo(name, problem) {
+  state.currentName = name;
+  state.current = problem;
+  state.subgoalIdx = 0;
+  state.completed = Array(problem.subgoals.length).fill(false);
+  state.reward = 0;
+  state.totalClicks = 0;
+  state.correctClicks = 0;
+  state.gameOver = false;
+
+  document.getElementById('problem-select').value = name;
+  document.getElementById('full-code').value = '';
+  setStatus('');
+  updateReward();
+  renderGrid();
+  updateHint();
+  updateBadges();
+}
+
+// ── GRID RENDER ──────────────────────────────────────────
+function renderGrid() {
+  const p = state.current;
+  const grid = document.getElementById('grid-canvas');
+  grid.innerHTML = '';
+
+  const sgMap = {};
+  p.subgoals.forEach(sg => { sgMap[`${sg.pos[0]},${sg.pos[1]}`] = sg; });
+  const goal = `${p.goal_pos[0]},${p.goal_pos[1]}`;
+  const traps = new Set((p.traps || []).map(t => `${t[0]},${t[1]}`));
+
+  let dummyIdx = 0;
+
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const key = `${r},${c}`;
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell';
+      cell.dataset.pos = key;
+
+      const posLabel = document.createElement('span');
+      posLabel.className = 'cell-pos';
+      posLabel.textContent = `(${r},${c})`;
+      cell.appendChild(posLabel);
+
+      const codeEl = document.createElement('div');
+
+      if (key === goal) {
+        cell.classList.add('goal');
+        codeEl.className = 'cell-goal-icon';
+        codeEl.textContent = '🏁';
+        cell.title = 'GOAL — reach here after completing all steps!';
+      } else if (sgMap[key]) {
+        const sg = sgMap[key];
+        const idx = p.subgoals.indexOf(sg);
+        codeEl.className = 'cell-code';
+        codeEl.textContent = sg.statement;
+        cell.dataset.sgIdx = idx;
+        if (state.completed[idx]) cell.classList.add('done');
+        cell.addEventListener('click', () => handleClick(r, c));
+      } else {
+        codeEl.className = 'cell-code dummy';
+        codeEl.textContent = DUMMY[dummyIdx % DUMMY.length];
+        dummyIdx++;
+        cell.addEventListener('click', () => handleWrongClick(r, c));
+      }
+
+      cell.appendChild(codeEl);
+      grid.appendChild(cell);
+    }
+  }
+}
+
+// ── CLICK HANDLING ────────────────────────────────────────
+function handleClick(r, c) {
+  if (state.gameOver) return;
+  const p = state.current;
+  const key = `${r},${c}`;
+  const target = p.subgoals[state.subgoalIdx];
+  const targetKey = `${target.pos[0]},${target.pos[1]}`;
+  state.totalClicks++;
+
+  if (key === targetKey) {
+    state.correctClicks++;
+    state.completed[state.subgoalIdx] = true;
+    state.subgoalIdx++;
+    state.reward += 5.0;
+    getCellEl(r, c).classList.add('done');
+    setStatus('✅ Correct! Great job.', 'var(--success)');
+    updateReward();
+    updateHint();
+
+    if (state.subgoalIdx >= p.subgoals.length) {
+      state.gameOver = true;
+      setStatus('🎉 All steps done! Amazing!', 'var(--success)');
+      showFullCode();
+    }
+  } else {
+    handleWrongClick(r, c);
+  }
+}
+
+function handleWrongClick(r, c) {
+  if (state.gameOver) return;
+  const p = state.current;
+  const key = `${r},${c}`;
+  const trapMsg = (p.trap_messages || {})[key];
+  state.reward -= 2.5;
+  updateReward();
+
+  const el = getCellEl(r, c);
+  el.classList.add('flashing');
+  if (trapMsg) {
+    setStatus(`💥 Trap! ${trapMsg}`, 'var(--danger)');
+  } else {
+    setStatus('❌ Wrong step! Read the hint carefully.', 'var(--danger)');
+  }
+  setTimeout(() => el.classList.remove('flashing'), 700);
+}
+
+function getCellEl(r, c) {
+  return document.querySelector(`.grid-cell[data-pos="${r},${c}"]`);
+}
+
+// ── GUIDE ME — shows only the next step hint ─────────────
+function guideMe() {
+  if (state.gameOver) return;
+  const p = state.current;
+  if (state.subgoalIdx >= p.subgoals.length) return;
+
+  const sg = p.subgoals[state.subgoalIdx];
+  const el = getCellEl(sg.pos[0], sg.pos[1]);
+
+  // Flash the next cell yellow briefly as a visual nudge
+  el.classList.add('guide');
+  setTimeout(() => el.classList.remove('guide'), 1200);
+
+  // Show the hint for this step only
+  document.getElementById('hint-text').textContent =
+    `💡 Step ${state.subgoalIdx + 1} hint: ${sg.hint}`;
+  document.getElementById('sub-label').textContent =
+    'Find and click the highlighted cell ↑';
+
+  setStatus('🟡 Hint revealed — try clicking the right cell!', 'var(--warn)');
+}
+
+function resetEpisode() {
+  delete state.problems[state.currentName];
+  loadProblem(state.currentName);
+}
+
+// ── GENERATION ────────────────────────────────────────────
+function openGenModal() {
+  document.getElementById('gen-modal').classList.add('show');
+  document.getElementById('gen-topic').value = '';
+  setTimeout(() => document.getElementById('gen-topic').focus(), 100);
+}
+function closeGenModal() {
+  document.getElementById('gen-modal').classList.remove('show');
+}
+
+async function runGenerate() {
+  const topic = document.getElementById('gen-topic').value.trim();
+  if (!topic) { showToast('Please enter a topic!'); return; }
+  closeGenModal();
+  showLoading('Asking Groq to create a problem…');
+  try {
+    const r = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic, source: 'groq'})
+    });
+    const p = await r.json();
+    if (p.error) throw new Error(p.error);
+    const name = p.name;
+    state.problems[name] = p;
+    if (!state.generatedProblems.includes(name)) {
+      state.generatedProblems.push(name);
+      addProblemToSelect(name, p.level);
+    }
+    switchTo(name, p);
+    showToast(`✨ Generated: ${name}`);
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+function addProblemToSelect(name, level) {
+  const sel = document.getElementById('problem-select');
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = `Lv${level} · ${name}`;
+  sel.appendChild(opt);
+}
+
+// ── FEEDBACK ─────────────────────────────────────────────
+let fbState = { stars: 0, q2: '', q2s: 0, q3: '', q3s: 0, q4: '', q4s: 0, q5: '', q6: '', q6s: 0, diff: 'Just right', diffs: 2 };
+
+function openFeedback() {
+  fbState = { stars: 0, q2: '', q2s: 0, q3: '', q3s: 0, q4: '', q4s: 0, q5: '', q6: '', q6s: 0, diff: 'Just right', diffs: 2 };
+  document.querySelectorAll('.star-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('fb-suggestions').value = '';
+  document.querySelectorAll('.diff-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.includes('Just right'));
+  });
+  document.getElementById('fb-meta').textContent = `Problem: ${state.currentName}`;
+  document.getElementById('fb-modal').classList.add('show');
+}
+function closeFeedback() {
+  document.getElementById('fb-modal').classList.remove('show');
+}
+
+function setStar(n) {
+  fbState.stars = n;
+  document.querySelectorAll('.star-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.v) <= n);
+  });
+}
+function selectRadio(q, val, score, el) {
+  fbState[q] = val;
+  fbState[q + 's'] = score;
+  el.closest('.radio-options').querySelectorAll('.radio-option')
+    .forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function setDiff(val, score, el) {
+  fbState.diff = val;
+  fbState.diffs = score;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function submitFeedback() {
+  if (!fbState.stars) { showToast('⭐ Please give a star rating!'); return; }
+  const entry = {
+    problem:            state.currentName,
+    source:             state.current?.source || 'builtin',
+    q1_helpfulness:     fbState.stars,
+    q2_coding_text:     fbState.q2,
+    q3_engaging_text:   fbState.q3,
+    q4_sequential_text: fbState.q4,
+    q5_challenge:       fbState.q5,
+    q6_skills_text:     fbState.q6,
+    q7_difficulty:      fbState.diff,
+    q8_suggestions:     document.getElementById('fb-suggestions').value.trim(),
+    score_q1_helpfulness:    fbState.stars,
+    score_q2_coding:         fbState.q2s,
+    score_q3_engaging:       fbState.q3s,
+    score_q4_sequential:     fbState.q4s,
+    score_q6_skills:         fbState.q6s,
+    score_q7_difficulty:     fbState.diffs,
+    composite_score: +((fbState.q2s + fbState.q3s + fbState.q4s + fbState.q6s) / 4).toFixed(2),
+    total_reward:       state.reward,
+    click_accuracy_pct: state.totalClicks > 0
+      ? Math.round(state.correctClicks / state.totalClicks * 100) : 0,
+    correct_clicks:     state.correctClicks,
+    total_clicks:       state.totalClicks,
+    timestamp:          new Date().toISOString(),
+  };
+  try {
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(entry)
+    });
+    closeFeedback();
+    showToast('🎉 Feedback saved! Thank you!');
+  } catch(e) {
+    showToast('❌ Could not save feedback');
+  }
+}
+
+// ── UI HELPERS ────────────────────────────────────────────
+function updateHint() {
+  const p = state.current;
+  if (!p) return;
+  if (state.subgoalIdx >= p.subgoals.length) {
+    document.getElementById('hint-text').textContent = '🎉 All steps completed!';
+    document.getElementById('sub-label').textContent = '';
+  } else {
+    const sg = p.subgoals[state.subgoalIdx];
+    document.getElementById('hint-text').textContent =
+      `Step ${state.subgoalIdx + 1} of ${p.subgoals.length}: ${sg.hint}`;
+    document.getElementById('sub-label').textContent =
+      'Click the matching cell on the grid ↑';
+  }
+}
+
+function updateBadges() {
+  const p = state.current;
+  document.getElementById('badge-level').textContent = `Level ${p.level}`;
+  document.getElementById('badge-topic').textContent = p.topic || '';
+  const src = p.source || 'builtin';
+  const srcEl = document.getElementById('badge-source');
+  srcEl.textContent = src.toUpperCase();
+  srcEl.className = 'badge badge-' + src;
+}
+
+function updateReward() {
+  const el = document.getElementById('reward-val');
+  el.textContent = state.reward.toFixed(1);
+  el.style.color = state.reward >= 0 ? 'var(--success)' : 'var(--danger)';
+}
+
+function setStatus(msg, color = 'var(--success)') {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.style.color = color;
+}
+
+function showFullCode() {
+  document.getElementById('full-code').value = state.current.full_code || '';
+}
+
+function showLoading(msg = 'Loading…') {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
