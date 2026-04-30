@@ -14,7 +14,7 @@ GROK_API_KEY = os.getenv("API_KEY")
 GROK_URL     = "https://api.groq.com/openai/v1/chat/completions"
 
 # ── SUPABASE CONFIG ───────────────────────────────────────
-SUPABASE_URL    = "https://aubumhhvjyhttqumbvhb.supabase.co"
+SUPABASE_URL    = os.getenv("SUPABASE_URL")
 SUPABASE_SECRET = os.getenv("SECRET_KEY")
 
 # ── CURRICULUM ────────────────────────────────────────────
