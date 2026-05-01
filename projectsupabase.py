@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import json, re, random, ssl, urllib.request, urllib.error
-from dotenv import load_dotenv
 import os
 app = Flask(__name__)
-load_dotenv
 # ── SSL FIX ──────────────────────────────────────────────
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
