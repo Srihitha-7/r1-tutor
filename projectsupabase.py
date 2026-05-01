@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import json, re, random, ssl, urllib.request, urllib.error
-from dotev import load_dotenv
+from dotenv import load_dotenv
 import os
 app = Flask(__name__)
 load_dotenv
